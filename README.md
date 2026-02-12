@@ -1,8 +1,7 @@
 # Astro Link Forecasting
 
 TODO: 
-1. Add the data files.
-2. Add the code of LLM extraction & SIMBAD resolution
+1. add citations
 
 This repository accompanies the paper:
 
