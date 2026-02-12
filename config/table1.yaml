@@ -1,0 +1,118 @@
+# config/table1.yaml
+
+paths:
+  data_dir: data
+  out_dir: /content/outputs
+
+  papers_year: papers_year_mapping.csv
+  concept_map: papers_concepts_mapping.csv
+  concept_vocab: concepts_vocabulary.csv
+  concept_embeddings: concepts_embeddings.npz
+
+  po_agg: paper_object_edges_llm_v2_agg.parquet
+  po_mentions: paper_object_edges_llm_v2_mentions.jsonl
+
+  simbad_name_cache: simbad_name_resolution_cache_llm_objects_with_otype_and_errors_clean.jsonl
+  simbad_alias_cache: null
+
+weights:
+  role_weight:
+    primary_subject: 3.0
+    host_or_counterpart: 2.0
+    candidate_association: 1.5
+    foreground_or_lens: 1.5
+    background_or_lensed_source: 1.5
+    member_of_sample: 1.0
+    non_detection_or_upper_limit: 1.0
+    comparison_or_reference: 0.25
+    calibration: 0.25
+    serendipitous_or_field_source: 0.25
+    other: 0.75
+
+  study_mode_mult:
+    new_observation: 1.25
+    archival_or_reanalysis: 1.10
+    catalog_compilation: 1.00
+    simulation_or_theory: 0.90
+    not_applicable: 0.0
+    unknown: 0.50
+
+  context_roles:
+    - comparison_or_reference
+    - calibration
+    - serendipitous_or_field_source
+
+edge_configs:
+  train:
+    name: train_all
+    noreg: true
+    role_filter: all
+    study_filter: all
+    weighting: role_x_mode
+    paper_norm: none
+    paper_tau: 25.0
+    force_mentions_jsonl: true
+    cache: true
+
+  target:
+    name: target_all
+    noreg: true
+    role_filter: all
+    study_filter: all
+    weighting: role_x_mode
+    paper_norm: none
+    paper_tau: 25.0
+    force_mentions_jsonl: true
+    cache: true
+
+cutoffs: [2017]
+#, 2019, 2021, 2023]
+min_train_pos: 10
+
+metrics:
+  ndcg_k: 100
+
+knn:
+  ks: [5]
+  # , 10, 25, 50, 100, 150, 200]
+  aa:
+    use_binary_for_similarity: true
+    mix_global: 0.0
+    seed: 0
+
+smoothing:
+  enabled: true
+  lam: 0.50
+  k: 100
+
+als:
+  enabled: true
+  seeds: [0]
+  factors: 128
+  regularization: 0.05
+  iterations: 30
+  alpha: 10.0
+  use_gpu_train: true
+
+methods:
+  random: true
+  popularity: true
+  recent_popularity: true
+  knn_aa: true
+  knn_textemb: true
+  als: true
+  add_smoothing_variants: true
+
+baselines:
+  recent_windows: [3, 5]
+  random_seed: 0
+
+runtime:
+  force_rebuild_global: false
+  overwrite_cutoff: false
+
+output:
+  out_subdir: table1
+  strata_to_report:
+    - physical_subset_excl_stats_sim_instr
+  csv_path: table1/eval_stratified_results.csv

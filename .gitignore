@@ -1,0 +1,20 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.so
+
+# Environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Project data and outputs
+!data/README.md
+outputs/
+
+# Editors/IDE
+.vscode/
+.idea/
