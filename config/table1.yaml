@@ -9,7 +9,6 @@ paths:
   concept_vocab: concepts_vocabulary.csv
   concept_embeddings: concepts_embeddings.npz
 
-  po_agg: paper_object_edges_llm_agg.parquet
   po_mentions: paper_object_edges_llm_mentions.jsonl
 
   simbad_name_cache: simbad_name_resolution_cache_llm_objects_with_otype_and_errors_clean.jsonl
@@ -65,16 +64,14 @@ edge_configs:
     force_mentions_jsonl: true
     cache: true
 
-cutoffs: [2017]
-#, 2019, 2021, 2023]
+cutoffs: [2017, 2019, 2021, 2023]
 min_train_pos: 10
 
 metrics:
   ndcg_k: 100
 
 knn:
-  ks: [5]
-  # , 10, 25, 50, 100, 150, 200]
+  ks: [5,10, 25, 50, 100, 150, 200]
   aa:
     use_binary_for_similarity: true
     mix_global: 0.0

@@ -53,16 +53,13 @@ OUT_DIR = Path(os.environ.get("ASTRO_OUT_DIR", str(REPO_ROOT / "outputs")))
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Default filenames (match Colab notebook)
-PAPERS_YEAR_PATH = DATA_DIR / "papers_year_mapping.csv"
-CONCEPT_MAP_PATH = DATA_DIR / "papers_concepts_mapping.csv"
-VOCAB_PATH = DATA_DIR / "concepts_vocabulary.csv"
-
-PO_AGG_PATH = DATA_DIR / "paper_object_edges_llm_agg.parquet"
-PO_MENTIONS_PATH = DATA_DIR / "paper_object_edges_llm_mentions.jsonl"
-
-ALIAS_CACHE_PATH = DATA_DIR / "simbad_alias_cache.jsonl"  # optional
-NAME_CACHE_PATH = DATA_DIR / "simbad_name_resolution_cache_llm_objects_with_otype_and_errors_clean.jsonl"
-FAILURES_PATH = DATA_DIR / "simbad_resolution_failures.jsonl"  # optional
+PAPERS_YEAR_PATH: Path
+CONCEPT_MAP_PATH: Path
+VOCAB_PATH: Path
+PO_MENTIONS_PATH: Path
+NAME_CACHE_PATH: Path
+ALIAS_CACHE_PATH: Path
+FAILURES_PATH: Path
 
 # =============================================================================
 # Config override support (YAML-driven)
@@ -82,7 +79,7 @@ def apply_config(cfg: dict, *, cfg_dir: Path | None = None) -> None:
     global _PIPELINE_CFG, _PIPELINE_CFG_DIR
     global DATA_DIR, OUT_DIR
     global PAPERS_YEAR_PATH, CONCEPT_MAP_PATH, VOCAB_PATH
-    global PO_AGG_PATH, PO_MENTIONS_PATH
+    global PO_MENTIONS_PATH
     global ALIAS_CACHE_PATH, NAME_CACHE_PATH, FAILURES_PATH
     global ROLE_WEIGHT, STUDY_MODE_MULT, CONTEXT_ROLES
     global _GLOBAL_CACHE
@@ -116,7 +113,6 @@ def apply_config(cfg: dict, *, cfg_dir: Path | None = None) -> None:
     CONCEPT_MAP_PATH = resolve_file(cfg_get(cfg, "paths.concept_map", "papers_concepts_mapping.csv"), base_dir=DATA_DIR)
     VOCAB_PATH = resolve_file(cfg_get(cfg, "paths.concept_vocab", "concepts_vocabulary.csv"), base_dir=DATA_DIR)
 
-    PO_AGG_PATH = resolve_file(cfg_get(cfg, "paths.po_agg", "paper_object_edges_llm_agg.parquet"), base_dir=DATA_DIR)
     PO_MENTIONS_PATH = resolve_file(cfg_get(cfg, "paths.po_mentions", "paper_object_edges_llm_mentions.jsonl"), base_dir=DATA_DIR)
 
     NAME_CACHE_PATH = resolve_file(
@@ -381,28 +377,6 @@ def load_po_mentions() -> pd.DataFrame:
     return df
 
 
-def load_po_agg() -> pd.DataFrame:
-    if not PO_AGG_PATH.exists():
-        raise FileNotFoundError(f"Need {PO_AGG_PATH.name}; got exists=False at {PO_AGG_PATH}")
-    po = pd.read_parquet(PO_AGG_PATH)
-    need = {"arxiv_id", "object_name_norm", "obj_weight", "roles"}
-    missing = need - set(po.columns)
-    if missing:
-        raise ValueError(f"PO_AGG missing columns: {missing} | cols={po.columns.tolist()}")
-    po = po.copy()
-    if len(po) > 0 and isinstance(po.iloc[0]["roles"], str):
-        po["roles"] = po["roles"].map(lambda s: ast.literal_eval(s) if isinstance(s, str) else s)
-    po["arxiv_id"] = po["arxiv_id"].astype("string").str.strip()
-    po["object_name_norm"] = po["object_name_norm"].astype("string")
-    po["obj_weight"] = po["obj_weight"].astype("float32")
-
-    tot = po.groupby("arxiv_id")["obj_weight"].sum()
-    print("po_agg total obj_weight per paper quantiles:")
-    print(tot.quantile([0.5, 0.9, 0.95, 0.99, 0.999]))
-
-    return po[["arxiv_id", "object_name_norm", "obj_weight", "roles"]]
-
-
 def apply_paper_norm(po_resolved: pd.DataFrame, cfg: EdgeConfig) -> pd.DataFrame:
     if cfg.paper_norm == "none":
         return po_resolved
@@ -440,83 +414,73 @@ def build_mentions(cfg: EdgeConfig) -> pd.DataFrame:
     tag = cfg_tag(cfg)
     cache_dir = OUT_DIR / "mentions_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_dir / f"mentions__{tag}.parquet"
+    cache_path = cache_dir / f"mentions__{tag}.jsonl"
 
+    # Optional: JSONL cache
     if cfg.cache and cache_path.exists():
         print("[cache hit]", cache_path.name)
-        return pd.read_parquet(cache_path)
+        return pd.read_json(cache_path, lines=True)
 
     # ---- Load paper-year + paper->concept ----
     papers_year = pd.read_csv(PAPERS_YEAR_PATH, dtype={"arxiv_id": "string", "year": "int32"})
-    papers_year["arxiv_id"] = papers_year["arxiv_id"].astype("string").str.strip()
-    papers_year = papers_year.dropna(subset=["arxiv_id", "year"]).copy()
+    papers_year["arxiv_id"] = papers_year["arxiv_id"].str.strip()
+    papers_year = papers_year.dropna(subset=["arxiv_id", "year"])
     year_map = dict(zip(papers_year["arxiv_id"].astype(str), papers_year["year"].astype(int)))
 
     concept_map = pd.read_csv(CONCEPT_MAP_PATH, dtype={"arxiv_id": "string", "label": "int32"})
-    concept_map["arxiv_id"] = concept_map["arxiv_id"].astype("string").str.strip()
-    concept_map = concept_map.dropna(subset=["arxiv_id", "label"]).copy()
-    concept_map = concept_map.drop_duplicates(subset=["arxiv_id", "label"]).reset_index(drop=True)
+    concept_map["arxiv_id"] = concept_map["arxiv_id"].str.strip()
+    concept_map = concept_map.dropna(subset=["arxiv_id", "label"])
+    concept_map = concept_map.drop_duplicates(subset=["arxiv_id", "label"])
 
-    # ---- Build paper-object weights ----
-    need_mentions = (
-        cfg.force_mentions_jsonl
-        or cfg.role_filter != "all"
-        or cfg.study_filter != "all"
-        or cfg.weighting != "role_x_mode"
-    )
+    # ---- Always build from mention-level JSONL ----
+    pm = load_po_mentions()
 
-    if need_mentions:
-        pm = load_po_mentions()
+    # role filter
+    if cfg.role_filter == "substantive":
+        pm = pm[~pm["role"].isin(CONTEXT_ROLES)]
+    elif cfg.role_filter == "primary_only":
+        pm = pm[pm["role"] == "primary_subject"]
+    elif cfg.role_filter != "all":
+        raise ValueError(f"Unknown role_filter: {cfg.role_filter}")
 
-        # role filter
-        if cfg.role_filter == "substantive":
-            pm = pm[~pm["role"].isin(CONTEXT_ROLES)].copy()
-        elif cfg.role_filter == "primary_only":
-            pm = pm[pm["role"] == "primary_subject"].copy()
-        elif cfg.role_filter != "all":
-            raise ValueError(f"Unknown role_filter: {cfg.role_filter}")
+    # study filter
+    if cfg.study_filter == "non_sim_only":
+        pm = pm[~pm["study_mode"].isin({"simulation_or_theory", "not_applicable"})]
+    elif cfg.study_filter == "new_obs_only":
+        pm = pm[pm["study_mode"] == "new_observation"]
+    elif cfg.study_filter != "all":
+        raise ValueError(f"Unknown study_filter: {cfg.study_filter}")
 
-        # study filter
-        if cfg.study_filter == "non_sim_only":
-            pm = pm[~pm["study_mode"].isin({"simulation_or_theory", "not_applicable"})].copy()
-        elif cfg.study_filter == "new_obs_only":
-            pm = pm[pm["study_mode"] == "new_observation"].copy()
-        elif cfg.study_filter != "all":
-            raise ValueError(f"Unknown study_filter: {cfg.study_filter}")
-
-        # weighting
-        if cfg.weighting == "binary":
-            pm["mention_weight"] = np.float32(1.0)
-        elif cfg.weighting == "role_x_mode":
-            pm["role_weight"] = pm["role"].map(ROLE_WEIGHT).fillna(np.float32(0.75)).astype("float32")
-            pm["mode_mult"] = pm["study_mode"].map(STUDY_MODE_MULT).fillna(np.float32(0.50)).astype("float32")
-            pm["mention_weight"] = (pm["role_weight"] * pm["mode_mult"]).astype("float32")
-        else:
-            raise ValueError(f"Unknown weighting: {cfg.weighting}")
-
-        pm = pm[pm["mention_weight"] > 0].copy()
-
-        po_agg = (
-            pm.groupby(["arxiv_id", "object_name_norm"], as_index=False)
-            .agg(
-                obj_weight=("mention_weight", "sum"),
-                roles=("role", _uniq_sorted),
-            )
-        )
-        po_agg["obj_weight"] = po_agg["obj_weight"].astype("float32")
-
+    # weighting
+    if cfg.weighting == "binary":
+        pm["mention_weight"] = np.float32(1.0)
+    elif cfg.weighting == "role_x_mode":
+        pm["role_weight"] = pm["role"].map(ROLE_WEIGHT).fillna(np.float32(0.75))
+        pm["mode_mult"] = pm["study_mode"].map(STUDY_MODE_MULT).fillna(np.float32(0.50))
+        pm["mention_weight"] = (pm["role_weight"] * pm["mode_mult"]).astype(np.float32)
     else:
-        po_agg = load_po_agg()
+        raise ValueError(f"Unknown weighting: {cfg.weighting}")
+
+    pm = pm[pm["mention_weight"] > 0]
+
+    # Aggregate to paper–object
+    po_agg = (
+        pm.groupby(["arxiv_id", "object_name_norm"], as_index=False)
+        .agg(
+            obj_weight=("mention_weight", "sum"),
+            roles=("role", _uniq_sorted),
+        )
+    )
+    po_agg["obj_weight"] = po_agg["obj_weight"].astype(np.float32)
 
     print("po_agg:", po_agg.shape, "| unique papers:", po_agg["arxiv_id"].nunique())
 
     # ---- Resolve to SIMBAD main_id ----
-    po_agg = po_agg.copy()
     po_agg["object_id"] = po_agg["object_name_norm"].map(map_main_id)
-    po_agg = po_agg.dropna(subset=["object_id"]).copy()
+    po_agg = po_agg.dropna(subset=["object_id"])
     po_agg["object_id"] = po_agg["object_id"].astype(str)
 
-    # Deduplicate (paper, object_id) after resolution (multiple names can map to same object)
+    # Deduplicate after alias resolution
     def _merge_roles(series):
         out = set()
         for v in series:
@@ -528,33 +492,31 @@ def build_mentions(cfg: EdgeConfig) -> pd.DataFrame:
         po_agg.groupby(["arxiv_id", "object_id"], as_index=False)
         .agg(obj_weight=("obj_weight", "sum"), roles=("roles", _merge_roles))
     )
-    po["obj_weight"] = po["obj_weight"].astype("float32")
+    po["obj_weight"] = po["obj_weight"].astype(np.float32)
 
-    # ---- Optional: noReg ----
+    # ---- Optional noReg ----
     if cfg.noreg and isinstance(otype_by_main, dict) and len(otype_by_main) > 0:
         bad = po["object_id"].map(lambda mid: is_region_like(mid, otype_by_main.get(mid))).astype(bool)
-        po = po[~bad].copy()
+        po = po[~bad]
 
-    # ---- Year ----
-    po["year"] = po["arxiv_id"].astype(str).map(year_map).astype("Int32")
-    po = po.dropna(subset=["year"]).copy()
+    # ---- Add year ----
+    po["year"] = po["arxiv_id"].map(year_map)
+    po = po.dropna(subset=["year"])
     po["year"] = po["year"].astype(int)
 
-    # ---- Optional: per-paper normalization ----
+    # ---- Optional per-paper normalization ----
     po = apply_paper_norm(po, cfg)
 
     # ---- Join to concepts ----
     mentions = po.merge(concept_map, on="arxiv_id", how="inner")
     mentions["role_weight"] = mentions["obj_weight"].astype(np.float32)
 
-    mentions = mentions.dropna(subset=["label", "object_id", "year"]).copy()
+    mentions = mentions.dropna(subset=["label", "object_id", "year"])
     mentions["label"] = mentions["label"].astype(int)
-    mentions["object_id"] = mentions["object_id"].astype(str)
-    mentions["year"] = mentions["year"].astype(int)
 
-    # cache
+    # ---- JSONL cache ----
     if cfg.cache:
-        mentions.to_parquet(cache_path, index=False)
+        mentions.to_json(cache_path, orient="records", lines=True)
         print("[cache write]", cache_path.name)
 
     print(
@@ -569,6 +531,7 @@ def build_mentions(cfg: EdgeConfig) -> pd.DataFrame:
         "| objects:",
         int(mentions["object_id"].nunique()),
     )
+
     return mentions
 
 # =============================================================================
@@ -784,7 +747,6 @@ def write_global_artifacts(
         "data_dir": str(DATA_DIR),
         "papers_year_path": str(PAPERS_YEAR_PATH),
         "concept_map_path": str(CONCEPT_MAP_PATH),
-        "po_agg_path": str(PO_AGG_PATH),
         "po_mentions_path": str(PO_MENTIONS_PATH),
         "alias_cache_path": str(ALIAS_CACHE_PATH),
         "name_cache_path": str(NAME_CACHE_PATH),
@@ -1116,6 +1078,9 @@ if __name__ == "__main__":
     parser.add_argument("--overwrite-cutoff", action="store_true", help="Overwrite per-cutoff artifacts if present.")
     parser.add_argument("--config", type=str, default=None, help="YAML config path (optional).")
     args = parser.parse_args()
+    if args.config is None:
+        raise ValueError("A YAML config must be provided via --config.")
+
 
 
     from src.utils import load_yaml_config
