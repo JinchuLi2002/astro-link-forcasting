@@ -1,4 +1,3 @@
-```markdown
 # Astro Link Forecasting
 
 This repository accompanies the paper:
@@ -272,4 +271,3 @@ Altering edge construction changes the scientific object of study and should be 
 # 7. Citation
 
 (placeholder — add citation after review period)
-```
