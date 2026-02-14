@@ -407,9 +407,9 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                 object_id_to_idx=G["object_id_to_idx"],
                 ndcg_k=ndcg_k,
             )
-            _add_run(all_runs, rand_pc, method="Random", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+            _add_run(all_runs, rand_pc, method="Random", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
             if smooth_enabled and add_smoothing_variants:
-                _add_run(all_runs, rand_pc, method="Random+SmoothTextEmb", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                _add_run(all_runs, rand_pc, method="Random+SmoothTextEmb", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
         if run_popularity:
             pop_obj_scores = np.asarray(X_train.sum(axis=0)).ravel().astype(np.float32)
@@ -422,9 +422,9 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                 object_id_to_idx=G["object_id_to_idx"],
                 ndcg_k=ndcg_k,
             )
-            _add_run(all_runs, pop_pc, method="Popularity", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+            _add_run(all_runs, pop_pc, method="Popularity", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
             if smooth_enabled and add_smoothing_variants:
-                _add_run(all_runs, pop_pc, method="Popularity+SmoothTextEmb", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                _add_run(all_runs, pop_pc, method="Popularity+SmoothTextEmb", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
         if run_recent:
             for W in [int(x) for x in cfg_get(cfg, "baselines.recent_windows", [3, 5])]:
@@ -444,9 +444,9 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                     object_id_to_idx=G["object_id_to_idx"],
                     ndcg_k=ndcg_k,
                 )
-                _add_run(all_runs, rpc, method=f"RecentPopularity_W{W}", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                _add_run(all_runs, rpc, method=f"RecentPopularity_W{W}", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
                 if smooth_enabled and add_smoothing_variants:
-                    _add_run(all_runs, rpc, method=f"RecentPopularity_W{W}+SmoothTextEmb", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                    _add_run(all_runs, rpc, method=f"RecentPopularity_W{W}+SmoothTextEmb", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
         # ---------------- KNN-AA ----------------
         if run_knn_aa and KMAX > 0:
@@ -519,7 +519,7 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                     met["label"] = int(cid)
                     rows.append(met)
                 knnAA_pc = pd.DataFrame(rows)
-                _add_run(all_runs, knnAA_pc, method=f"ConceptKNN_AA_K{int(K)}", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                _add_run(all_runs, knnAA_pc, method=f"ConceptKNN_AA_K{int(K)}", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
                 if smooth_enabled and add_smoothing_variants:
                     rows = []
@@ -532,7 +532,7 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                         met["label"] = int(cid)
                         rows.append(met)
                     knnAA_s = pd.DataFrame(rows)
-                    _add_run(all_runs, knnAA_s, method=f"ConceptKNN_AA_K{int(K)}+SmoothTextEmb", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                    _add_run(all_runs, knnAA_s, method=f"ConceptKNN_AA_K{int(K)}+SmoothTextEmb", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
         # ---------------- KNN-TextEmb ----------------
         if run_knn_textemb and KMAX > 0:
@@ -578,7 +578,7 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                     met["label"] = int(cid)
                     rows.append(met)
                 knnEmb = pd.DataFrame(rows)
-                _add_run(all_runs, knnEmb, method=f"ConceptKNN_TextEmb_K{int(K)}", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                _add_run(all_runs, knnEmb, method=f"ConceptKNN_TextEmb_K{int(K)}", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
                 if smooth_enabled and add_smoothing_variants:
                     rows = []
@@ -591,7 +591,7 @@ def run_from_config(cfg: dict, *, cfg_dir: Path) -> pd.DataFrame:
                         met["label"] = int(cid)
                         rows.append(met)
                     knnEmb_s = pd.DataFrame(rows)
-                    _add_run(all_runs, knnEmb_s, method=f"ConceptKNN_TextEmb_K{int(K)}+SmoothTextEmb", cutoff=T, seed=-1, eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
+                    _add_run(all_runs, knnEmb_s, method=f"ConceptKNN_TextEmb_K{int(K)}+SmoothTextEmb", cutoff=T, seed=int(cfg_get(cfg, "baselines.random_seed", 0)), eligible=eligible, strata=STRATA, ndcg_k=ndcg_k, strata_to_report=strata_to_report)
 
         # ---------------- ALS ----------------
         if run_als_flag:

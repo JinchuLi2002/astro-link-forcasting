@@ -22,11 +22,11 @@ The default configuration reproduces both:
 
 This repository implements the complete forecasting workflow:
 
-1. Construction of temporal Mode B train/test splits  
+1. Construction of strict temporal train/test splits  
 2. Concept–object graph assembly from literature-derived data  
 3. Concept-embedding neighbor construction (for smoothing and embedding-based baselines)  
 4. Training and evaluation of forecasting methods  
-5. Stratified metric aggregation  
+5. Stratified metric aggregation 
 
 ---
 
@@ -308,8 +308,6 @@ OUT_DIR/
 # 6. Reproducibility Guarantees
 
 - Graph construction is deterministic given config.
-- Temporal splits follow strict Mode B semantics.
-- Weighting is config-defined.
 - No pre-aggregated graph artifacts are required.
 
 Altering edge construction changes the scientific object of study and should be clearly documented in derived experiments.
