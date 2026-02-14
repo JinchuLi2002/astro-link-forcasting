@@ -175,7 +175,7 @@ edge_configs.train == edge_configs.target
 
 ## Stratified Evaluation
 
-Stratification (via `output.strata_to_report`) determines which concepts are included in reported metrics.
+Stratification (via `output.strata_to_report`) determines which *concepts* are included when reporting evaluation metrics.
 
 Example:
 
@@ -185,13 +185,61 @@ output:
     - physical_subset_excl_stats_sim_instr
 ```
 
-Important:
+Stratification is applied **after graph construction**.
 
-- The graph is constructed over the full concept universe.
-- Stratification only affects reporting.
+This means:
+
+- The concept–object graph is built over the full concept universe.
+- Temporal splits are computed on the full graph.
+- Stratification only filters which concepts contribute to reported metrics.
 - No held-out information is used during graph construction.
 
 Training on all concepts and reporting on a subset (e.g., physical concepts) is valid and used in the paper.
+
+---
+
+### Available Strata
+
+The following concept subsets are constructed from the concept vocabulary:
+
+| Stratum name | Definition |
+|--------------|------------|
+| `all` | All concepts in the training universe |
+| `physical_subset_excl_stats_sim_instr` | Concepts whose high-level class is **not** in {Statistics & AI, Numerical Simulation, Instrumental Design} |
+| `nonphysical_only_stats_sim_instr` | Concepts whose class is in {Statistics & AI, Numerical Simulation, Instrumental Design} |
+| `survey_or_measurement_keyword` | Concepts whose name or description matches a survey/instrument/measurement keyword regex |
+
+---
+
+### Notes on `survey_or_measurement_keyword`
+
+The `survey_or_measurement_keyword` subset is defined using a heuristic regular expression applied to concept names and descriptions (e.g., Gaia, SDSS, photometry, calibration, etc.).
+
+Important considerations:
+
+- This subset is heuristic and based on crude text matching.
+- It overlaps substantially with the `nonphysical_only_stats_sim_instr` subset.
+- It is not reported as a headline result in the paper.
+- Empirically, performance on this subset is similar to or weaker than the physical subset.
+
+It is included primarily for diagnostic and exploratory analysis rather than as a primary evaluation target.
+
+---
+
+### Best Practice
+
+For reproducing the paper:
+
+```yaml
+output:
+  strata_to_report:
+    - physical_subset_excl_stats_sim_instr
+```
+
+Altering strata changes only which concepts are reported, not how the graph is constructed.
+
+If reporting on alternative strata, this should be clearly documented in derived experiments.
+
 
 ---
 
