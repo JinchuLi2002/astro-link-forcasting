@@ -47,7 +47,6 @@ Required files (place in `data/`):
 
 This repository does not redistribute AstroMLab 5 data.
 
----
 
 ## Object Extraction Data (This Work)
 
@@ -90,8 +89,6 @@ All experiments are controlled via:
 config/table1.yaml
 ```
 
----
-
 ## Edge Weight Construction
 
 Edge weights are computed as:
@@ -113,7 +110,6 @@ weights:
 
 Changing these values changes the underlying graph and therefore the scientific question being evaluated.
 
----
 
 ## Edge Configuration (Important)
 
@@ -152,7 +148,6 @@ The evaluation assumes:
 - Only temporal cutoff defines the split
 - Stratification is applied after graph construction
 
----
 
 ## Train vs. Target Configuration
 
@@ -171,7 +166,80 @@ For scientific clarity and reproducibility, keep:
 edge_configs.train == edge_configs.target
 ```
 
----
+## Role and Study Filtering
+
+Edge construction can optionally filter object mentions before aggregation.
+
+These controls are defined under:
+
+```yaml
+edge_configs:
+  train:
+    role_filter:
+    study_filter:
+    noreg:
+```
+
+### `role_filter`
+
+Controls which semantic roles are retained:
+
+- `all` — keep all object mentions (used in the paper)
+- `substantive` — exclude context roles
+- `primary_only` — retain only primary scientific targets
+
+Context roles are defined in:
+
+```yaml
+weights:
+  context_roles:
+```
+
+By default:
+
+```yaml
+context_roles:
+  - comparison_or_reference
+  - calibration
+  - serendipitous_or_field_source
+```
+
+These correspond to objects mentioned incidentally, for benchmarking, calibration, or field context.
+
+In the main experiments, `role_filter: all` is used.  
+Context roles are therefore **included but downweighted** via their smaller role weights.
+
+
+### `study_filter`
+
+Controls filtering by study type:
+
+- `all` — retain all study modes (used in the paper)
+- `non_sim_only` — exclude theory/simulation-only mentions
+- `new_obs_only` — retain only new observational studies
+
+The main results use:
+
+```yaml
+study_filter: all
+```
+
+
+### `noreg`
+
+```yaml
+noreg: true
+```
+
+When enabled, objects classified as sky regions or fields (based on SIMBAD object type metadata) are excluded.
+
+This prevents non-physical spatial regions (e.g., survey fields) from behaving like astrophysical objects.
+
+The main experiments use:
+
+```yaml
+noreg: true
+```
 
 ## Stratified Evaluation
 
@@ -196,7 +264,6 @@ This means:
 
 Training on all concepts and reporting on a subset (e.g., physical concepts) is valid and used in the paper.
 
----
 
 ### Available Strata
 
@@ -208,8 +275,6 @@ The following concept subsets are constructed from the concept vocabulary:
 | `physical_subset_excl_stats_sim_instr` | Concepts whose high-level class is **not** in {Statistics & AI, Numerical Simulation, Instrumental Design} |
 | `nonphysical_only_stats_sim_instr` | Concepts whose class is in {Statistics & AI, Numerical Simulation, Instrumental Design} |
 | `survey_or_measurement_keyword` | Concepts whose name or description matches a survey/instrument/measurement keyword regex |
-
----
 
 ### Notes on `survey_or_measurement_keyword`
 
@@ -224,7 +289,6 @@ Important considerations:
 
 It is included primarily for diagnostic and exploratory analysis rather than as a primary evaluation target.
 
----
 
 ### Best Practice
 
@@ -241,7 +305,6 @@ Altering strata changes only which concepts are reported, not how the graph is c
 If reporting on alternative strata, this should be clearly documented in derived experiments.
 
 
----
 
 ## Other Key Config Fields
 
