@@ -1,8 +1,33 @@
 cff-version: 1.2.0
-title: "astrograph-forecasting: Table 1 reproduction"
+title: "Predicting New Concept-Object Associations in Astronomy by Mining the Literature"
+message: "If you use this code or reproduce results from this repository, please cite the associated paper."
+type: software
+version: 1.0.0
+
 authors:
-  - family-names: Lastname
-    given-names: Firstname
-    affiliation: TBD
-version: 0.0.0
-message: "Please cite this placeholder entry until full metadata is added."
+  - family-names: Li
+    given-names: Jinchu
+  - family-names: Ting
+    given-names: Yuan-Sen
+  - family-names: Accomazzi
+    given-names: Alberto
+  - family-names: Ghosal
+    given-names: Tirthankar
+  - family-names: Ramachandra
+    given-names: Nesar
+
+identifiers:
+  - type: arxiv
+    value: "2602.14335"
+
+repository-code: "https://github.com/JinchuLi2002/astro-link-forecasting"
+
+keywords:
+  - astronomy
+  - knowledge graph
+  - link prediction
+  - literature mining
+  - temporal evaluation
+  - concept-object associations
+
+license: MIT
